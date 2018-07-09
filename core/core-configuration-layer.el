@@ -37,10 +37,6 @@
   (expand-file-name (concat spacemacs-start-directory "layers/"))
   "Spacemacs layers directory.")
 
-(defconst configuration-layer-private-directory
-  (expand-file-name (concat spacemacs-start-directory "private/"))
-  "Spacemacs private layers base directory.")
-
 (defconst configuration-layer-private-layer-directory
   (let ((dotspacemacs-layer-dir
          (when dotspacemacs-directory
@@ -49,7 +45,7 @@
     (if (and dotspacemacs-directory
              (file-exists-p dotspacemacs-layer-dir))
         dotspacemacs-layer-dir
-      configuration-layer-private-directory))
+      spacemacs-private-directory))
   "Spacemacs default directory for private layers.")
 
 (defconst configuration-layer-lock-file
@@ -584,9 +580,10 @@ refreshed during the current session."
    (spacemacs-force-dump
     ;; force dump
     (configuration-layer//load)
-    (configuration-layer/message (concat "--force-dump passed on the command line, "
-                       "forcing a redump."))
-    (configuration-layer//dump-emacs))
+    (when (spacemacs/emacs-with-pdumper-set-p)
+      (configuration-layer/message (concat "--force-dump passed on the command line, "
+                         "forcing a redump."))
+      (configuration-layer//dump-emacs)))
    ((spacemacs-is-dumping-p)
     ;; dumping
     (configuration-layer//load)
@@ -668,8 +665,9 @@ To prevent package from being installed or uninstalled set the variable
   (configuration-layer//set-layers-variables configuration-layer--used-layers)
   (configuration-layer//load-layers-files configuration-layer--used-layers
                         '("keybindings.el"))
-  (dotspacemacs|call-func dotspacemacs/user-load
-                          "Calling dotfile user-load..."))
+  (when (spacemacs-is-dumping-p)
+    (dotspacemacs|call-func dotspacemacs/user-load
+                            "Calling dotfile user-load...")))
 
 (defun configuration-layer/load-auto-layer-file ()
   "Load `auto-layer.el' file"
@@ -1393,7 +1391,7 @@ discovery."
                        ;; layers shipped with spacemacs
                        (list configuration-layer-directory)
                        ;; layers in private folder ~/.emacs.d/private
-                       (list configuration-layer-private-directory)
+                       (list spacemacs-private-directory)
                        ;; layers in dotdirectory
                        ;; this path may not exist, so check if it does
                        (when dotspacemacs-directory
@@ -1974,7 +1972,7 @@ RNAME is the name symbol of another existing layer."
       nil))
    ((eq 'local location)
     (let ((dir (if (eq 'dotfile owner)
-                   configuration-layer-private-directory
+                   spacemacs-private-directory
                  (let* ((owner (configuration-layer/get-layer owner)))
                    (when owner (oref owner :dir))))))
       (if dir
@@ -2444,18 +2442,21 @@ depends on it."
   (let ((stats (configuration-layer/configured-packages-stats
                 configuration-layer--used-packages)))
     (spacemacs-buffer/insert-page-break)
-    (spacemacs-buffer/append
-     (format "\n%s packages loaded in %.3fs (e:%s r:%s l:%s b:%s)"
-             (cadr (assq 'total stats))
-             configuration-layer--spacemacs-startup-time
-             (cadr (assq 'elpa stats))
-             (cadr (assq 'recipe stats))
-             (cadr (assq 'local stats))
-             (cadr (assq 'built-in stats))))
     (with-current-buffer (get-buffer-create spacemacs-buffer-name)
       (let ((buffer-read-only nil))
-	(spacemacs-buffer//center-line)
-	(insert "\n")))))
+        (spacemacs-buffer/append
+         (format "\n%s packages loaded in %.3fs (e:%s r:%s l:%s b:%s)"
+                 (cadr (assq 'total stats))
+                 configuration-layer--spacemacs-startup-time
+                 (cadr (assq 'elpa stats))
+                 (cadr (assq 'recipe stats))
+                 (cadr (assq 'local stats))
+                 (cadr (assq 'built-in stats))))
+        (spacemacs-buffer//center-line)
+        (spacemacs-buffer/append (format "\n(%.3fs spent in your user-config)"
+                           dotspacemacs--user-config-elapsed-time))
+        (spacemacs-buffer//center-line)
+        (insert "\n")))))
 
 (defun configuration-layer//get-indexed-elpa-package-names ()
   "Return a list of all ELPA packages in indexed packages and dependencies."
