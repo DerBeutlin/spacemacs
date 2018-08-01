@@ -59,3 +59,5 @@ private/
 /doc/COMMUNITY.org
 /doc/CONTRIBUTING.org
 /org-caldav-*.el
+/org-caldav-backup.org
+/org-recent-headings
